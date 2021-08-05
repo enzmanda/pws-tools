@@ -1,9 +1,9 @@
 Param (
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$PrinterName,
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$PrinterIP,
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [String]$DriverName,
     [String]$InfDir
 )
@@ -12,7 +12,7 @@ Param (
 Switch ($InfDir, $DriverName) {
     # check if inf file is valid
     { $InfDir -isnot $null } {
-        if (Test-Path $InfDir) { 
+        if (Test-Path $InfDir) {  # add an and here to make sure there is an .inf file here somewhere
             "Installing provided driver from: ${InfDir}"  
             (Get-ChildItem $InfDir -Recurse -Filter "*.inf").foreach( {
                     pnputil.exe /add-driver $_.FullName /install 
@@ -22,7 +22,7 @@ Switch ($InfDir, $DriverName) {
         else { 
             "No valid inf-file provided, no driver will be installed" 
         }
-        # check driver name to be legit
+        # check driver name to be legit and that the driver in question is installed
     } { $DriverName -isnot $null } { 
         if ($null -ne (Get-PrinterDriver -Name $DriverName)) {
             Write-Host "Required driver ${$DriverName} is installed"
@@ -36,13 +36,18 @@ Switch ($InfDir, $DriverName) {
     }
 }
 
-# Verify network connection
-(Test-Connection -TargetName $PrinterIP -IPv4) ? ("Connection to printer can be established") : ( Throw "Cannot reach printer, check your network connection")
+# Verify network connection and add printer
+if (Test-Connection -TargetName $PrinterIP -IPv4) { 
+    "Connection to printer can be established" 
+    #Install the Driver:
+    Add-PrinterDriver -Name $DriverName
+    #Create the local Printer Port
+    Add-PrinterPort -Name "TCP:${PrinterIP}" -PrinterHostAddress $PrinterIP
+    #And then add the printer, using the Port, Driver and Printer name you've chosen
+    Add-Printer -Name $PrinterName -PortName "TCP:${PrinterIP}" -DriverName $DriverName -Shared:$false
+}
+else { 
+    Throw "Cannot reach printer, check your network connection" 
+}
 
-#Install the Driver:
-Add-PrinterDriver -Name $DriverName
-#Create the local Printer Port
-Add-PrinterPort -Name "TCP:${PrinterIP}" -PrinterHostAddress $PrinterIP
-#And then add the printer, using the Port, Driver and Printer name you've chosen
-Add-Printer -Name $PrinterName -PortName "TCP:${PrinterIP}" -DriverName $DriverName -Shared:$false
 

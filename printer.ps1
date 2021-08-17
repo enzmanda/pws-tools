@@ -6,8 +6,12 @@ Param (
     [String]$UserName,
     [Parameter(Mandatory = $true)]
     [String]$DriverName,
-    [String]$InfDir
+    [String]$InfDir,
+    [String]$LogLocation = "./logs"
 )
+
+# start logging
+Start-Transcript -OutputDirectory $LogLocation -IncludeInvocationHeader
 
 # Checking drivers
 Switch ($InfDir, $DriverName) {
@@ -38,13 +42,11 @@ Switch ($InfDir, $DriverName) {
     }
 }
 
-
 # Verify network connection and add printer
 if (Test-Connection -TargetName $PrinterIP -IPv4) { 
     "Connection to printer can be established" 
     #Install the Driver:
     Add-PrinterDriver -Name $DriverName
-    #Create the local Printer Port
     if ($null -ne $UserName) {
         $ConnectionName = "$($PrinterAddress)/$($UserName)"
     } 
@@ -57,4 +59,4 @@ else {
     Throw "Cannot reach printer, check your network connection" 
 }
 
-
+Stop-Transcript

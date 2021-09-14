@@ -21,15 +21,14 @@ param (
 )
 # TODO: Add logging functionality that takes place if bool logging is set to true
 
-$ExpiredFiles = New-Object PSObject -Property @{}
+$ExpiredFiles = @()
 
 # remake this into a switch
-# instead of just writing to host, create an object that stores the files to be removed due to the failsafe
-# TODO: change folder to file
 If (Test-Path -Path $Path) {
-    foreach ($folder in (Get-ChildItem -Path $Path -Attributes Directory) | Where-Object { 
+    foreach ($file in (Get-ChildItem -Recurse -Path $Path) | Where-Object { 
             ([System.DateTimeOffset](((Get-Date).AddDays(-$TimeInDays)).ToUniversalTime())).ToUnixTimeSeconds() -gt ([System.DateTimeOffset]$_.CreationTimeUtc).ToUnixTimeSeconds() }) { 
-        Write-Host "$($folder.Name) created $($folder.CreationTime) will be removed"
+        Write-Host "$($file.Name) created $($file.CreationTime) will be removed"
+        $ExpiredFiles += $file.FullName
     }
 }
 else {
@@ -57,17 +56,24 @@ function removeFiles {
         If (Test-Path -Path $Temp) {
             "Temp folder alraedy exists, skipping creation"
             # change this up to take attributes from the object
-            Move-Item -Path $folder -Destination $Temp -Force
         }
         else {
             New-Item -Path $tempLocation -Name "Temp" -ItemType "directory" 
         }
+        $ExpiredFiles.ForEach({
+        Move-Item -Path $PSItem -Destination $Temp -Force
+        })
         Write-Host "Do you wish to remove all files in the following directories? $(Get-ChildItem -Path $Temp -Attributes "Directory" | Select-Object $_.Name )"
         Remove-Item -Path $Temp -Recurse -Confirm
     }
     else {
-            # change this up to take attributes from the object
-        Write-Host "Removing contents of $File"
-        Remove-Item -Path $File -Recurse
+        # change this up to take attributes from the object
+        #  Write-Host "Removing contents of $File"
+        #  Remove-Item -Path $File -Recurse
+        $ExpiredFiles.ForEach({
+                Remove-Item $PSItem -Force
+            })
     }
 }
+
+removeFiles -FailSafe $failSafe -tempLocation $tempLocation -ExpiredFiles $ExpiredFiles
